@@ -532,25 +532,18 @@ if __name__ == '__main__':
             len_seq = list(batch['len_seq'].values())
             target=list(batch['next'].values())
 
-            target_neg = []
-            for index in range(args.batch_size):
-                neg=np.random.randint(item_num)
-                while neg==target[index]:
-                    neg = np.random.randint(item_num)
-                target_neg.append(neg)
             optimizer.zero_grad()
             seq = torch.LongTensor(seq)
             len_seq = torch.LongTensor(len_seq)
             target = torch.LongTensor(target)
-            target_neg = torch.LongTensor(target_neg)
+
             seq = seq.to(device)
             target = target.to(device)
             len_seq = len_seq.to(device)
-            target_neg = target_neg.to(device)
+
 
             x_start = model.cacu_x(target)
 
-            x_start_neg = model.cacu_x(target_neg)
             h = model.cacu_h(seq, len_seq, args.p)
 
             n = torch.randint(0, args.timesteps, (args.batch_size, ), device=device).long()
