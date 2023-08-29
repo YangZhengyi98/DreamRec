@@ -11,7 +11,7 @@ import logging
 import time as Time
 from utility import pad_history,calculate_hit,extract_axis_1
 from collections import Counter
-from Transformer_ori import *
+from SASRecModules_ori import *
 
 logging.getLogger().setLevel(logging.INFO)
 
