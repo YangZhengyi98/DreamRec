@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=500,
                         help='Number of max epochs.')
     parser.add_argument('--data', nargs='?', default='yc',
-                        help='yc, ks, rr')
+                        help='yc, ks, zhihu')
     # parser.add_argument('--pretrain', type=int, default=1,
     #                     help='flag for pretrain. 1: initialize from pretrain; 0: randomly initialize; -1: save the model to pretrain file')
     parser.add_argument('--batch_size', type=int, default=256,
