@@ -139,19 +139,19 @@ class diffusion():
         return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
     def p_losses(self, denoise_model, x_start, h, t, noise=None, loss_type="l2"):
-        # 先采样噪声
+        # 
         if noise is None:
             noise = torch.randn_like(x_start) 
             # noise = torch.randn_like(x_start) / 100
         
-        # 用采样得到的噪声去加噪图片
+        # 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
 
         predicted_x = denoise_model(x_noisy, h, t)
 
         
-        # 根据加噪了的图片去预测采样的噪声
+        # 
         if loss_type == 'l1':
             loss = F.l1_loss(x_start, predicted_x)
         elif loss_type == 'l2':
