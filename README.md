@@ -2,7 +2,7 @@
 
 ## Update the data, code and training log of SASRec on YooChoose dataset. -- 2023.8.29
 
-## Udate the experimental results on YooChoose data under the random split setting. -- 2023.8.30
+## Update the experimental results on YooChoose data under the random split setting. -- 2023.8.30
 
 We have just obtained the preliminary results using the random data split setting with the same data provided in work [1]. The initial results are outlined below (the results of SASRec and SASRec-PRL are directly extracted  from work [1]):
 
