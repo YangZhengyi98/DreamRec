@@ -22,8 +22,8 @@ def parse_args():
                         help='Number of max epochs.')
     parser.add_argument('--data', nargs='?', default='yc',
                         help='yc, ks, zhihu')
-    # parser.add_argument('--pretrain', type=int, default=1,
-    #                     help='flag for pretrain. 1: initialize from pretrain; 0: randomly initialize; -1: save the model to pretrain file')
+    parser.add_argument('--random_seed', type=int, default=100,
+                        help='random seed')
     parser.add_argument('--batch_size', type=int, default=256,
                         help='Batch size.')
     parser.add_argument('--layers', type=int, default=1,
@@ -36,29 +36,13 @@ def parse_args():
                         help='beta end of diffusion')
     parser.add_argument('--beta_start', type=float, default=0.0001,
                         help='beta start of diffusion')
-    parser.add_argument('--filter_sizes', nargs='?', default='[2,3,4]',
-                        help='Specify the filter_size')
-    parser.add_argument('--r_click', type=float, default=0.2,
-                        help='reward for the click behavior.')
-    parser.add_argument('--r_buy', type=float, default=1.0,
-                        help='reward for the purchase behavior.')
     parser.add_argument('--lr', type=float, default=0.005,
                         help='Learning rate.')
-    parser.add_argument('--model_name', type=str, default='Gru_bce',
-                        help='model name.')
-    parser.add_argument('--save_flag', type=int, default=0,
-                        help='0: Disable model saver, 1: Activate model saver')
     parser.add_argument('--cuda', type=int, default=0,
                         help='cuda device.')
-    parser.add_argument('--l2_decay', type=float, default=0,
-                        help='l2 loss reg coef.')
-    parser.add_argument('--dro_reg', type=float, default=0,
-                        help='dro reg.')
-    parser.add_argument('--gamma', type=float, default=0.5,
-                        help='gamma for ps')
     parser.add_argument('--dropout_rate', type=float, default=0.1,
                         help='dropout ')
-    parser.add_argument('--w', type=float, default=1.0,
+    parser.add_argument('--w', type=float, default=2.0,
                         help='dropout ')
     parser.add_argument('--p', type=float, default=0.1,
                         help='dropout ')
@@ -71,6 +55,18 @@ def parse_args():
     parser.add_argument('--descri', type=str, default='',
                         help='description of the work.')
     return parser.parse_args()
+
+args = parse_args()
+
+def setup_seed(seed):
+     torch.manual_seed(seed)
+     torch.cuda.manual_seed_all(seed)
+     np.random.seed(seed)
+     random.seed(seed)
+     torch.backends.cudnn.deterministic = True
+
+setup_seed(args.random_seed)
+
 
 def extract(a, t, x_shape):
     batch_size = t.shape[0]
@@ -95,6 +91,23 @@ def exp_beta_schedule(timesteps, beta_min=0.1, beta_max=10):
     betas = 1 - torch.exp(- beta_min / timesteps - x * 0.5 * (beta_max - beta_min) / (timesteps * timesteps))
     return betas
 
+def betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar, max_beta=0.999):
+    """
+    Create a beta schedule that discretizes the given alpha_t_bar function,
+    which defines the cumulative product of (1-beta) over time from t = [0,1].
+    :param num_diffusion_timesteps: the number of betas to produce.
+    :param alpha_bar: a lambda that takes an argument t from 0 to 1 and
+                      produces the cumulative product of (1-beta) up to that
+                      part of the diffusion process.
+    :param max_beta: the maximum beta to use; use values lower than 1 to
+                     prevent singularities.
+    """
+    betas = []
+    for i in range(num_diffusion_timesteps):
+        t1 = i / num_diffusion_timesteps
+        t2 = (i + 1) / num_diffusion_timesteps
+        betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
+    return np.array(betas)
 
 class diffusion():
     def __init__(self, timesteps, beta_start, beta_end):
@@ -102,10 +115,14 @@ class diffusion():
         self.beta_start = beta_start
         self.beta_end = beta_end
 
-        # define beta schedule
-        # self.betas = linear_beta_schedule(timesteps=self.timesteps, beta_start=self.beta_start, beta_end=self.beta_end)
-        # self.betas = cosine_beta_schedule(timesteps=self.timesteps)
-        self.betas = exp_beta_schedule(timesteps=self.timesteps)
+        if args.beta_sche == 'linear':
+            self.betas = linear_beta_schedule(timesteps=self.timesteps, beta_start=self.beta_start, beta_end=self.beta_end)
+        elif args.beta_sche == 'exp':
+            self.betas = exp_beta_schedule(timesteps=self.timesteps)
+        elif args.beta_sche =='cosine':
+            self.betas = cosine_beta_schedule(timesteps=self.timesteps)
+        elif args.beta_sche =='sqrt':
+            self.betas = torch.tensor(betas_for_alpha_bar(self.timesteps, lambda t: 1-np.sqrt(t + 0.0001),)).float()
 
         # define alphas 
         self.alphas = 1. - self.betas
@@ -461,7 +478,7 @@ def evaluate(model, test_data, diff, w, device):
 
 if __name__ == '__main__':
 
-    args = parse_args()
+    # args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda)
 
     data_directory = './data/' + args.data
