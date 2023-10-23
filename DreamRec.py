@@ -459,28 +459,10 @@ def evaluate(model, test_data, diff, w, device):
     return hr_20
 
 
-
-def calcu_propensity_score(buffer):
-    items = list(buffer['next'])
-    freq = Counter(items)
-    for i in range(item_num):
-        if i not in freq.keys():
-            freq[i] = 0
-    pop = [freq[i] for i in range(item_num)]
-    pop = np.array(pop)
-    ps = pop + 1
-    ps = ps / np.sum(ps)
-    return ps
-
-
-
 if __name__ == '__main__':
 
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda)
-
-    # logging.basicConfig(filename="./log/{}/{}_{}_lr{}_decay{}_dro{}_gamma{}".format(args.data + '_final2', Time.strftime("%m-%d %H:%M:%S", Time.localtime()), args.model_name, args.lr, args.l2_decay, args.dro_reg, args.gamma))
-    # Network parameters
 
     data_directory = './data/' + args.data
     # data_directory = './data/' + args.data
