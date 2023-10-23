@@ -38,6 +38,8 @@ def parse_args():
                         help='beta start of diffusion')
     parser.add_argument('--lr', type=float, default=0.005,
                         help='Learning rate.')
+    parser.add_argument('--l2_decay', type=float, default=0,
+                        help='l2 loss reg coef.')
     parser.add_argument('--cuda', type=int, default=0,
                         help='cuda device.')
     parser.add_argument('--dropout_rate', type=float, default=0.1,
@@ -52,6 +54,8 @@ def parse_args():
                         help='type of diffuser.')
     parser.add_argument('--optimizer', type=str, default='adam',
                         help='type of optimizer.')
+    parser.add_argument('--beta_sche', nargs='?', default='exp',
+                        help='')
     parser.add_argument('--descri', type=str, default='',
                         help='description of the work.')
     return parser.parse_args()
@@ -110,10 +114,11 @@ def betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar, max_beta=0.999):
     return np.array(betas)
 
 class diffusion():
-    def __init__(self, timesteps, beta_start, beta_end):
+    def __init__(self, timesteps, beta_start, beta_end, w):
         self.timesteps = timesteps
         self.beta_start = beta_start
         self.beta_end = beta_end
+        self.w = w
 
         if args.beta_sche == 'linear':
             self.betas = linear_beta_schedule(timesteps=self.timesteps, beta_start=self.beta_start, beta_end=self.beta_end)
@@ -187,9 +192,9 @@ class diffusion():
         )
     
     @torch.no_grad()
-    def p_sample(self, model_forward, model_forward_uncon, x, h, t, t_index, w):
+    def p_sample(self, model_forward, model_forward_uncon, x, h, t, t_index):
 
-        x_start = (1 + w) * model_forward(x, h, t) - w * model_forward_uncon(x, t)
+        x_start = (1 + self.w) * model_forward(x, h, t) - self.w * model_forward_uncon(x, t)
         x_t = x 
         model_mean = (
             extract(self.posterior_mean_coef1, t, x_t.shape) * x_start +
@@ -205,12 +210,12 @@ class diffusion():
             return model_mean + torch.sqrt(posterior_variance_t) * noise 
         
     @torch.no_grad()
-    def sample(self, model_forward, model_forward_uncon, h, w):
+    def sample(self, model_forward, model_forward_uncon, h):
         x = torch.randn_like(h)
         # x = torch.randn_like(h) / 100
 
         for n in reversed(range(0, self.timesteps)):
-            x = self.p_sample(model_forward, model_forward_uncon, x, h, torch.full((h.shape[0], ), n, device=device, dtype=torch.long), n, w)
+            x = self.p_sample(model_forward, model_forward_uncon, x, h, torch.full((h.shape[0], ), n, device=device, dtype=torch.long), n)
 
         return x
 
@@ -398,7 +403,7 @@ class Tenc(nn.Module):
 
         return h  
     
-    def predict(self, states, len_states, diff, w):
+    def predict(self, states, len_states, diff):
         #hidden
         inputs_emb = self.item_embeddings(states)
         inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
@@ -413,7 +418,7 @@ class Tenc(nn.Module):
         state_hidden = extract_axis_1(ff_out, len_states - 1)
         h = state_hidden.squeeze()
 
-        x = diff.sample(self.forward, self.forward_uncon, h, w)
+        x = diff.sample(self.forward, self.forward_uncon, h)
         
         test_item_emb = self.item_embeddings.weight
         scores = torch.matmul(x, test_item_emb.transpose(0, 1))
@@ -422,7 +427,7 @@ class Tenc(nn.Module):
 
 
 
-def evaluate(model, test_data, diff, w, device):
+def evaluate(model, test_data, diff, device):
     eval_data=pd.read_pickle(os.path.join(data_directory, test_data))
 
     batch_size = 100
@@ -446,7 +451,7 @@ def evaluate(model, test_data, diff, w, device):
         states = torch.LongTensor(states)
         states = states.to(device)
 
-        prediction = model.predict(states, np.array(len_seq_b), diff, w)
+        prediction = model.predict(states, np.array(len_seq_b), diff)
         _, topK = prediction.topk(100, dim=1, largest=True, sorted=True)
         topK = topK.cpu().detach().numpy()
         sorted_list2=np.flip(topK,axis=1)
@@ -486,8 +491,6 @@ if __name__ == '__main__':
         os.path.join(data_directory, 'data_statis.df'))  # read data statistics, includeing seq_size and item_num
     seq_size = data_statis['seq_size'][0]  # the length of history to define the seq
     item_num = data_statis['item_num'][0]  # total number of items
-    reward_click = args.r_click
-    reward_buy = args.r_buy
     topk=[10, 20, 50]
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -495,7 +498,7 @@ if __name__ == '__main__':
 
 
     model = Tenc(args.hidden_factor,item_num, seq_size, args.dropout_rate, args.diffuser_type, device)
-    diff = diffusion(args.timesteps, args.beta_start, args.beta_end)
+    diff = diffusion(args.timesteps, args.beta_start, args.beta_end, args.w)
 
     if args.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, eps=1e-8, weight_decay=args.l2_decay)
@@ -511,9 +514,6 @@ if __name__ == '__main__':
     # optimizer.to(device)
 
     train_data = pd.read_pickle(os.path.join(data_directory, 'train_data.df'))
-    ps = calcu_propensity_score(train_data)
-    ps = torch.tensor(ps)
-    ps = ps.to(device)
 
     total_step=0
     hr_max = 0
@@ -560,9 +560,9 @@ if __name__ == '__main__':
                 
                 eval_start = Time.time()
                 print('-------------------------- VAL PHRASE --------------------------')
-                _ = evaluate(model, 'val_data.df', diff, args.w, device)
+                _ = evaluate(model, 'val_data.df', diff, device)
                 print('-------------------------- TEST PHRASE -------------------------')
-                _ = evaluate(model, 'test_data.df', diff, args.w, device)
+                _ = evaluate(model, 'test_data.df', diff, device)
                 print("Evalution cost: " + Time.strftime("%H: %M: %S", Time.gmtime(Time.time()-eval_start)))
                 print('----------------------------------------------------------------')
 
