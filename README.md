@@ -21,5 +21,5 @@ python -u DreamRec.py --data ks --timesteps 2000 --lr 0.0001 --beta_sche exp --w
 ### Zhihu Data
 
 ```
-python -u A_A_SDRecv2cfg.py --data zhihu --timesteps 500 --lr 0.01 --beta_sche linear --w 4 --optimizer adamw --diffuser_type mlp1 --random_seed 100 
+python -u DreamRec.py --data zhihu --timesteps 500 --lr 0.01 --beta_sche linear --w 4 --optimizer adamw --diffuser_type mlp1 --random_seed 100 
 ```
