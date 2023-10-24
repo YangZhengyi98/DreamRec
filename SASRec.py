@@ -319,23 +319,7 @@ if __name__ == '__main__':
             loss = bce_loss(scores, labels)
 
 
-            pos_scores_dro = torch.gather(torch.mul(model_output * model_output, ps), 1, target)
-            pos_scores_dro = torch.squeeze(pos_scores_dro)
-            pos_loss_dro = torch.gather(torch.mul((model_output - 1) * (model_output - 1), ps), 1, target)
-            pos_loss_dro = torch.squeeze(pos_loss_dro)
-
-            inner_dro = torch.sum(torch.exp(torch.clamp(torch.mul(model_output * model_output, ps) / args.beta, max=1e2)), 1) - torch.exp(torch.clamp(pos_scores_dro / args.beta, max=1e2)) + torch.exp(torch.clamp(pos_loss_dro / args.beta, max=1e2)) 
-
-            # A = torch.sum(torch.exp(torch.mul(model_output * model_output, ps)), 1)
-            # B = torch.exp(pos_scores_dro)
-            # C = torch.exp(pos_loss_dro) 
-            # print(A.shape, B.shape, C.shape)
-
-            loss_dro = torch.log(inner_dro + 1e-24)
-            if args.alpha == 0.0:
-                loss_all = loss
-            else:
-                loss_all = loss + args.alpha * torch.mean(loss_dro)
+            loss_all = loss
             loss_all.backward()
             optimizer.step()
 
@@ -344,31 +328,15 @@ if __name__ == '__main__':
                 total_step+=1
                 if total_step % 200 == 0:
                     print("the loss in %dth step is: %f" % (total_step, loss_all))
-                    # logging.info("the loss in %dth step is: %f" % (total_step, loss_all))
 
                 if total_step % 2000 == 0:
-                        # print('VAL:')
-                        # logging.info('VAL:')
-                        # hr_20 = evaluate(model, 'val_sessions_pos.df', device)
-                        print('VAL PHRASE:')
-                        # logging.info('VAL PHRASE:')
-                        hr_20 = evaluate(model, 'val_data.df', device)
-                        print('TEST PHRASE:')
-                        # logging.info('TEST PHRASE:')
-                        _ = evaluate(model, 'test_data.df', device)
-                        # print('TEST PHRASE3:')
-                        # logging.info('TEST PHRASE3:')
-                        # _ = evaluate(model, 'test_sessions3_pos.df', device)
+                    print('VAL PHRASE:')
+                    hr_20 = evaluate(model, 'val_data.df', device)
+                    print('TEST PHRASE:')
+                    _ = evaluate(model, 'test_data.df', device)
 
-                        if hr_20 > hr_max:
 
-                            hr_max = hr_20
-                            best_epoch = total_step
-                        
-                        print('BEST EPOCH:{}'.format(best_epoch))
-                        # logging.info('BEST EPOCH:{}'.format(best_epoch))
-                        all_item_emb = model.item_embeddings.weight.cpu().detach().numpy()
-                        np.save('./visual_sasrec_{}/all_item_arr_{}.npy'.format(args.data, total_step), all_item_emb)
+
 
 
 
