@@ -468,7 +468,7 @@ if __name__ == '__main__':
     elif args.optimizer =='rmsprop':
         optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr, eps=1e-8, weight_decay=args.l2_decay)
 
-    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=0.1, end_factor=1, total_iters=20)
+    # scheduler = lr_scheduler.LinearLR(optimizer, start_factor=0.1, end_factor=1, total_iters=20)
     
     model.to(device)
     # optimizer.to(device)
@@ -510,13 +510,13 @@ if __name__ == '__main__':
             optimizer.step()
 
 
-        scheduler.step()
+        # scheduler.step()
         if args.report_epoch:
             if i % 1 == 0:
                 print("Epoch {:03d}; ".format(i) + 'Train loss: {:.4f}; '.format(loss) + "Time cost: " + Time.strftime(
                         "%H: %M: %S", Time.gmtime(Time.time()-start_time)))
 
-            if (i + 1) % 5 == 0:
+            if (i + 1) % 10 == 0:
                 
                 eval_start = Time.time()
                 print('-------------------------- VAL PHRASE --------------------------')
