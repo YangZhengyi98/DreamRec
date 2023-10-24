@@ -6,6 +6,7 @@ import argparse
 import torch
 from torch import nn
 import torch.nn.functional as F
+import torch.optim.lr_scheduler as lr_scheduler
 import os
 import logging
 import time as Time
@@ -292,11 +293,8 @@ class Tenc(nn.Module):
             nn.Linear(self.hidden_size*2, self.hidden_size),
         )
 
-        if self.diffuser_type == 'res':
-            self.diff_mlp1 = nn.Linear(self.hidden_size * 3, self.hidden_size)
-            self.acf = nn.GELU()
-            self.diff_mlp2 = nn.Linear(self.hidden_size, self.hidden_size)
-        elif self.diffuser_type =='mlp1':
+
+        if self.diffuser_type =='mlp1':
             self.diffuser = nn.Sequential(
                 nn.Linear(self.hidden_size*3, self.hidden_size)
         )
@@ -306,38 +304,17 @@ class Tenc(nn.Module):
             nn.GELU(),
             nn.Linear(self.hidden_size*2, self.hidden_size)
         )
-        elif self.diffuser_type =='mlp_add':
-            self.diff_mlp1 = nn.Linear(self.hidden_size*2, self.hidden_size)
-        elif self.diffuser_type =='mlp2_add':
-            self.diff_mlp1 = nn.Linear(self.hidden_size*2, self.hidden_size)
-            self.diff_mlp2 = nn.Linear(self.hidden_size, self.hidden_size)
+
 
     def forward(self, x, h, step):
 
         t = self.step_mlp(step)
 
-        if self.diffuser_type == 'res':
 
-            res = self.diff_mlp1(torch.cat((x, h, t), dim=1))
-            res = self.acf(res)
-            res = res + x + h + t
-            res = self.diff_mlp2(res)
-        elif self.diffuser_type == 'mlp1':
+        if self.diffuser_type == 'mlp1':
             res = self.diffuser(torch.cat((x, h, t), dim=1))
         elif self.diffuser_type == 'mlp2':
             res = self.diffuser(torch.cat((x, h, t), dim=1))
-        elif self.diffuser_type == 'mlp_add':
-            res = self.diff_mlp1(torch.cat((x, h), dim=1))
-            res += t
-        elif self.diffuser_type == 'mlp2_add':
-            res = self.diff_mlp1(torch.cat((x, h), dim=1))
-            res += t
-            res = self.diff_mlp2(res)
-            res += t
-
-        elif self.diffuser_type == 'add':
-            res = x + h + t
-
         return res
 
     def forward_uncon(self, x, step):
@@ -346,27 +323,11 @@ class Tenc(nn.Module):
 
         t = self.step_mlp(step)
 
-        if self.diffuser_type == 'res':
-            res = self.diff_mlp1(torch.cat((x, h, t), dim=1))
-            res = self.acf(res)
-            res = res + x + h + t
-            res = self.diff_mlp2(res)
-        elif self.diffuser_type == 'mlp1':
+        if self.diffuser_type == 'mlp1':
             res = self.diffuser(torch.cat((x, h, t), dim=1))
         elif self.diffuser_type == 'mlp2':
             res = self.diffuser(torch.cat((x, h, t), dim=1))
-        elif self.diffuser_type == 'mlp_add':
-            res = self.diff_mlp1(torch.cat((x, h), dim=1))
-            res += t
-        elif self.diffuser_type == 'mlp2_add':
-            res = self.diff_mlp1(torch.cat((x, h), dim=1))
-            res += t
-            res = self.diff_mlp2(res)
-            res += t
-
-        elif self.diffuser_type == 'add':
-            res = x + h + t
-
+            
         return res
 
         # return x
@@ -476,8 +437,6 @@ def evaluate(model, test_data, diff, device):
 
     print('{:<10.6f} {:<10.6f} {:<10.6f} {:<10.6f} {:<10.6f} {:<10.6f}'.format(hr_list[0], (ndcg_list[0]), hr_list[1], (ndcg_list[1]), hr_list[2], (ndcg_list[2])))
 
-
-
     return hr_20
 
 
@@ -509,6 +468,7 @@ if __name__ == '__main__':
     elif args.optimizer =='rmsprop':
         optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr, eps=1e-8, weight_decay=args.l2_decay)
 
+    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=0.1, end_factor=1, total_iters=20)
     
     model.to(device)
     # optimizer.to(device)
@@ -550,13 +510,13 @@ if __name__ == '__main__':
             optimizer.step()
 
 
-
+        scheduler.step()
         if args.report_epoch:
             if i % 1 == 0:
                 print("Epoch {:03d}; ".format(i) + 'Train loss: {:.4f}; '.format(loss) + "Time cost: " + Time.strftime(
                         "%H: %M: %S", Time.gmtime(Time.time()-start_time)))
 
-            if (i + 1) % 10 == 0:
+            if (i + 1) % 5 == 0:
                 
                 eval_start = Time.time()
                 print('-------------------------- VAL PHRASE --------------------------')
