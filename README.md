@@ -2,7 +2,7 @@
 
 This is the implementation of our NeurIPS 2023 paper:
 
-> Zhengyi Yang, Jiancan Wu, Zhicai Wang, Xiang Wang, Yancheng Yuan, and Xiangnan He. Generate What You Prefer: Reshaping Sequential Recommendation via Guided Diffusion. In NeurIPS 2023. [arxiv](https://arxiv.org/abs/2310.20453)
+> Zhengyi Yang, Jiancan Wu, Zhicai Wang, Xiang Wang, Yancheng Yuan, and Xiangnan He. Generate What You Prefer: Reshaping Sequential Recommendation via Guided Diffusion. In NeurIPS 2023. [arXiv](https://arxiv.org/abs/2310.20453)
 
 <img src="./fig/method.png" alt="framework" width="300"/>
 
